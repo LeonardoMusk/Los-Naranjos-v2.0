@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Los Naranjos - Proveedores</title>
+    <link rel="stylesheet" href="estilo.css">
+    <link rel="shortcut icon" href="naranjito.png" type="image/x-icon">
+</head>
+
+<body>
+
+    <header>
+        <div class="logo-container">
+            <img src="logo.jpg" alt="Logo Los Naranjos">
+        </div>
+        <h1>Gestión de proveedores</h1>
+        <a href="admin.html">
+            <input class="volver" type="button" value="Volver">
+        </a>
+    </header>
+
+    <main>
+        <section>
+            <h3>Alta de Proveedores:</h3>
+            <p>
+                <input type="text" id="nombre" placeholder="Razón Social*">
+                <input type="text" id="cuit" placeholder="CUIT*">
+                <select id="rubro" class="estilo-input">
+                    <option value="">Seleccione un rubro*</option>
+                </select>
+
+            </p>
+            <p>
+                <input type="text" id="telefono" placeholder="Teléfono">
+                <input type="text" id="email" placeholder="Email">
+                <input type="text" id="direccion" placeholder="Calle">
+            </p>
+            <p>
+                <input type="number" id="numero" placeholder="Número*">
+
+                <select id="localidad" class="estilo-input">
+                    <option value="">Seleccione una localidad*</option>
+                </select>
+            </p>
+            <p>
+                <input type="button" value="Cargar Proveedor" onclick="guardarProveedor()">
+            </p>
+        </section>
+
+        <section>
+            <h3>Buscar, eliminar o modificar proveedores:</h3>
+            <p>
+                <input type="number" id="buscarId" placeholder="ID Proveedor">
+                <input type="button" value="Buscar Proveedor" onclick="buscarProveedorPorId()">
+                <input type="button" value="Eliminar Proveedor" onclick="eliminarProveedorPorId()">
+                <input type="button" value="Modificar Proveedor" onclick="modificarProveedor()">
+            </p>
+            <div id="resultadoBusqueda"></div>
+        </section>
+
+        <section>
+            <h3>Listado de Proveedores:</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Razón Social</th>
+                        <th>CUIT</th>
+                        <th>Rubro</th>
+                        <th>Teléfono</th>
+                        <th>Email</th>
+                        <th>Calle</th>
+                        <th>Número</th>
+                        <th>Localidad</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaProveedores"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <footer>
+        <h4>Los Naranjos - Gestión de proveedores</h4>
+    </footer>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+    <script>
+        const API_URL = "http://localhost:56925/api/proveedor";
+        const LOCALIDAD_API = "http://localhost:56925/api/localidad";
+        const RUBRO_API = "http://localhost:56925/api/rubro";
+
+        function cargarLocalidades() {
+            $.ajax({
+                type: "GET",
+                url: LOCALIDAD_API,
+                dataType: "json",
+                success: function (data) {
+                    const select = $("#localidad");
+                    select.empty();
+                    select.append(`<option value="">Seleccione una localidad*</option>`);
+
+                    data.forEach(loc => {
+                        select.append(`<option value="${loc.id_localidad}">${loc.nombre}</option>`);
+                    });
+                },
+                error: function () {
+                    alert("Error al cargar las localidades");
+                }
+            });
+        }
+
+        function cargarRubros() {
+            $.ajax({
+                type: "GET",
+                url: RUBRO_API,
+                dataType: "json",
+                success: function (data) {
+                    const select = $("#rubro");
+                    select.empty();
+                    select.append(`<option value="">Seleccione un rubro*</option>`);
+
+                    data.forEach(rubro => {
+                        select.append(`<option value="${rubro.id_rubro}">${rubro.nombre}</option>`);
+                    });
+                },
+                error: function () {
+                    alert("Error al cargar los rubros");
+                }
+            });
+        }
+
+        function guardarProveedor() {
+            const proveedor = {
+                razon_social: $("#nombre").val(),
+                cuit: $("#cuit").val(),
+                id_rubro: parseInt($("#rubro").val()),
+                telefono: $("#telefono").val(),
+                email: $("#email").val(),
+                calle: $("#direccion").val(),
+                numero: parseInt($("#numero").val()),
+                id_localidad: parseInt($("#localidad").val())
+            };
+
+            if (proveedor.razon_social && proveedor.cuit && proveedor.id_rubro && proveedor.id_localidad) {
+                $.ajax({
+                    type: "POST",
+                    url: API_URL,
+                    data: proveedor,
+                    success: function () {
+                        alert("Proveedor guardado correctamente");
+                        limpiarCampos();
+                        listarProveedores();
+                    },
+                    error: function () {
+                        alert("Error al guardar proveedor");
+                    }
+                });
+            } else {
+                alert("Complete los campos obligatorios: Razón Social, CUIT, Rubro, Localidad");
+            }
+        }
+
+        function listarProveedores() {
+            $.ajax({
+                type: "GET",
+                url: API_URL,
+                dataType: "xml",
+                success: function (xml) {
+                    const tabla = $("#tablaProveedores");
+                    tabla.html("");
+                    $(xml).find("Table").each(function () {
+                        let fila = `
+                        <tr>
+                            <td>${$(this).find("id_proveedor").text()}</td>
+                            <td>${$(this).find("razon_social").text()}</td>
+                            <td>${$(this).find("cuit").text()}</td>
+                            <td>${$(this).find("id_rubro").text()}</td>
+                            <td>${$(this).find("telefono").text()}</td>
+                            <td>${$(this).find("email").text()}</td>
+                            <td>${$(this).find("calle").text()}</td>
+                            <td>${$(this).find("numero").text()}</td>
+                            <td>${$(this).find("id_localidad").text()}</td>
+                        </tr>
+                    `;
+                        tabla.append(fila);
+                    });
+                },
+                error: function () {
+                    alert("Error al obtener los proveedores");
+                }
+            });
+        }
+
+        function buscarProveedorPorId() {
+            const id = $("#buscarId").val();
+            if (!id) {
+                alert("Ingrese un ID válido");
+                return;
+            }
+
+            $.ajax({
+                type: "GET",
+                url: `${API_URL}/${id}`,
+                dataType: "xml",
+                success: function (xml) {
+                    const proveedor = $(xml).find("Table");
+
+                    if (proveedor.length === 0) {
+                        $("#resultadoBusqueda").html(`<p style="color:red">Proveedor no encontrado</p>`);
+                        return;
+                    }
+
+                    let info = `
+                    <p><strong>Proveedor encontrado:</strong></p>
+                    <ul>
+                        <li>ID: ${proveedor.find("id_proveedor").text()}</li>
+                        <li>Razón Social: ${proveedor.find("razon_social").text()}</li>
+                        <li>CUIT: ${proveedor.find("cuit").text()}</li>
+                        <li>Teléfono: ${proveedor.find("telefono").text()}</li>
+                        <li>Email: ${proveedor.find("email").text()}</li>
+                        <li>Calle: ${proveedor.find("calle").text()} ${proveedor.find("numero").text()}</li>
+                        <li>Rubro: ${proveedor.find("id_rubro").text()}</li>
+                        <li>Localidad: ${proveedor.find("id_localidad").text()}</li>
+                    </ul>
+                `;
+                    $("#resultadoBusqueda").html(info);
+                },
+                error: function () {
+                    $("#resultadoBusqueda").html(`<p style="color:red">Proveedor no encontrado</p>`);
+                }
+            });
+        }
+
+        function eliminarProveedorPorId() {
+            const id = $("#buscarId").val();
+            if (!id) {
+                alert("Ingrese un ID válido");
+                return;
+            }
+
+            if (!confirm("¿Seguro que desea eliminar este proveedor?")) return;
+
+            $.ajax({
+                type: "DELETE",
+                url: `${API_URL}/${id}`,
+                success: function () {
+                    alert("Proveedor eliminado correctamente");
+                    $("#resultadoBusqueda").html("");
+                    listarProveedores();
+                },
+                error: function () {
+                    alert("Error al eliminar proveedor");
+                }
+            });
+        }
+
+        function modificarProveedor() {
+            const id = $("#buscarId").val();
+            if (!id) {
+                alert("Ingrese un ID válido");
+                return;
+            }
+
+            $.ajax({
+                type: "GET",
+                url: `${API_URL}/${id}`,
+                dataType: "xml",
+                success: function (xml) {
+                    const proveedor = $(xml).find("Table");
+
+                    if (proveedor.length === 0) {
+                        alert("Proveedor no encontrado");
+                        return;
+                    }
+
+                    $("#nombre").val(proveedor.find("razon_social").text());
+                    $("#cuit").val(proveedor.find("cuit").text());
+                    $("#rubro").val(proveedor.find("id_rubro").text());
+                    $("#telefono").val(proveedor.find("telefono").text());
+                    $("#email").val(proveedor.find("email").text());
+                    $("#direccion").val(proveedor.find("calle").text());
+                    $("#numero").val(proveedor.find("numero").text());
+                    $("#localidad").val(proveedor.find("id_localidad").text());
+
+                    alert("Proveedor cargado. Modifique los campos que desee y luego haga clic en 'Guardar Cambios'.");
+
+                    const btnCargar = document.querySelector('input[value="Cargar Proveedor"]');
+                    btnCargar.value = "Guardar Cambios";
+                    btnCargar.onclick = function () { guardarCambiosProveedor(id); };
+                },
+                error: function () {
+                    alert("Proveedor no encontrado");
+                }
+            });
+        }
+
+        function guardarCambiosProveedor(id) {
+            const proveedor = {
+                Id_Proveedor: parseInt(id),
+                Razon_Social: $("#nombre").val(),
+                Cuit: $("#cuit").val(),
+                Id_Rubro: parseInt($("#rubro").val()),
+                Telefono: $("#telefono").val(),
+                Email: $("#email").val(),
+                Calle: $("#direccion").val(),
+                Numero: parseInt($("#numero").val()),
+                Id_Localidad: parseInt($("#localidad").val())
+            };
+
+            if (!proveedor.Razon_Social || !proveedor.Cuit || isNaN(proveedor.Id_Rubro) || isNaN(proveedor.Id_Localidad)) {
+                alert("Complete los campos obligatorios: Razón Social, CUIT, Rubro, Localidad");
+                return;
+            }
+
+            $.ajax({
+                type: "PUT",
+                url: `${API_URL}/${id}`,
+                data: proveedor,
+                success: function () {
+                    alert("Proveedor actualizado correctamente.");
+                    limpiarCampos();
+                    listarProveedores();
+
+                    const btnCargar = document.querySelector('input[value="Guardar Cambios"]');
+                    btnCargar.value = "Cargar Proveedor";
+                    btnCargar.onclick = guardarProveedor;
+                },
+                error: function () {
+                    alert("Error al actualizar el proveedor.");
+                }
+            });
+        }
+
+        function limpiarCampos() {
+            $("#nombre").val("");
+            $("#cuit").val("");
+            $("#rubro").val("");
+            $("#telefono").val("");
+            $("#email").val("");
+            $("#direccion").val("");
+            $("#numero").val("");
+            $("#localidad").val("");
+        }
+
+        $(document).ready(function () {
+            listarProveedores();
+            cargarLocalidades();
+            cargarRubros();
+        });
+    </script>
+
+</body>
+
+</html>

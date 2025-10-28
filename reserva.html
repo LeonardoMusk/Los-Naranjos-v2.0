@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Los Naranjos - Nueva Reserva</title>
+    <link rel="stylesheet" href="estilo.css">
+    <link rel="shortcut icon" href="naranjito.png" type="image/x-icon">
+</head>
+
+<body>
+
+    <header>
+        <div class="logo-container">
+            <img src="logo.jpg" alt="Logo Los Naranjos">
+        </div>
+        <h1>Nueva Reserva</h1>
+        <a href="cliente.html">
+            <input class="volver" type="button" value="Volver">
+        </a>
+    </header>
+
+    <main>
+        <section>
+            <h3>Datos de la Reserva:</h3>
+            <p>
+                <select id="cliente" class="estilo-input">
+                    <option value="">Seleccione su nombre*</option>
+                </select>
+                <input type="datetime-local" id="fecha_reserva" class="estilo-input">
+            </p>
+        </section>
+
+        <section>
+            <h3>Productos a Reservar:</h3>
+            <p>
+                <select id="producto" class="estilo-input"></select>
+                <input type="number" id="cantidad" placeholder="Cantidad*" min="1">
+                <input type="button" value="Agregar" onclick="agregarProducto()">
+            </p>
+            <p id="infoStock"></p>
+
+            <h4>Productos Seleccionados:</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Cantidad</th>
+                        <th>Precio</th>
+                        <th>Subtotal</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaProductos"></tbody>
+            </table>
+            <p><strong>Total: $<span id="total">0.00</span></strong></p>
+        </section>
+
+        <section>
+            <p>
+                <input type="button" value="Confirmar Reserva" onclick="confirmarReserva()">
+                <input type="button" value="Limpiar Todo" onclick="limpiarTodo()">
+            </p>
+        </section>
+    </main>
+
+    <footer>
+        <h4>Los Naranjos - Sistema de Reservas</h4>
+    </footer>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script>
+        const API = {
+            reserva: "http://localhost:56925/api/reserva",
+            detalle: "http://localhost:56925/api/detallereserva",
+            cliente: "http://localhost:56925/api/cliente",
+            producto: "http://localhost:56925/api/producto"
+        };
+
+        let carrito = [];
+        let productos = [];
+
+        function cargarClientes() {
+            $.get(API.cliente, data => {
+                $("#cliente").html('<option value="">Seleccione su nombre*</option>');
+                data.forEach(c => $("#cliente").append(`<option value="${c.id_cliente}">${c.nombre}</option>`));
+            });
+        }
+
+        function cargarProductos() {
+            $.get(API.producto, data => {
+                productos = data;
+                $("#producto").html('<option value="">Seleccione un producto*</option>');
+                data.forEach(p => {
+                    let estadoStock = '';
+                    if (p.stock > 10) estadoStock = 'Stock disponible';
+                    else if (p.stock > 0) estadoStock = 'Stock bajo';
+                    else estadoStock = 'Sin stock';
+
+                    $("#producto").append(`<option value="${p.id_producto}" data-stock="${p.stock}">${p.nombre} - $${p.precio} (${p.stock} - ${estadoStock})</option>`);
+                });
+            });
+
+            $("#producto").change(function () {
+                const stock = $(this).find(':selected').data('stock');
+                const nombre = $(this).find(':selected').text().split(' - ')[0];
+                if (stock === undefined) return $("#infoStock").html('');
+
+                let color = '#2e7d32';
+                let mensaje = `Stock disponible: ${stock}`;
+
+                if (stock === 0) {
+                    color = '#e53935';
+                    mensaje = 'Sin stock';
+                } else if (stock < 10) {
+                    color = '#f57c00';
+                    mensaje = `Stock bajo: ${stock}`;
+                }
+
+                $("#infoStock").html(`<strong>${nombre}</strong> - ${mensaje}`).css('color', color);
+            });
+        }
+
+        function agregarProducto() {
+            const id = parseInt($("#producto").val());
+            const cant = parseInt($("#cantidad").val());
+
+            if (!id || !cant || cant <= 0) return alert("Seleccione producto y cantidad");
+
+            const prod = productos.find(p => p.id_producto === id);
+            if (!prod.stock) return alert(`${prod.nombre} sin stock`);
+
+            const enCarrito = carrito.filter(i => i.id_producto === id).reduce((s, i) => s + i.cantidad, 0);
+            if (enCarrito + cant > prod.stock) {
+                return alert(`Stock insuficiente.\nDisponible: ${prod.stock}\nEn carrito: ${enCarrito}\nRestante: ${prod.stock - enCarrito}`);
+            }
+
+            carrito.push({ id_producto: id, nombre: prod.nombre, cantidad: cant, precio: prod.precio });
+            mostrarCarrito();
+            $("#producto, #cantidad").val("");
+            $("#infoStock").html('');
+        }
+
+        function mostrarCarrito() {
+            let html = '', total = 0;
+            carrito.forEach((item, i) => {
+                const sub = item.cantidad * item.precio;
+                total += sub;
+                html += `<tr>
+                    <td>${item.nombre}</td>
+                    <td>${item.cantidad}</td>
+                    <td>$${item.precio.toFixed(2)}</td>
+                    <td>$${sub.toFixed(2)}</td>
+                    <td><button onclick="eliminar(${i})">X</button></td>
+                </tr>`;
+            });
+            $("#tablaProductos").html(html);
+            $("#total").text(total.toFixed(2));
+        }
+
+        function eliminar(i) {
+            carrito.splice(i, 1);
+            mostrarCarrito();
+        }
+
+        function confirmarReserva() {
+            const idCliente = parseInt($("#cliente").val());
+            const fecha = $("#fecha_reserva").val();
+
+            if (!idCliente || !fecha) return alert("Complete cliente y fecha");
+            if (!carrito.length) return alert("Agregue productos");
+
+            $.ajax({
+                type: "POST",
+                url: API.reserva,
+                data: JSON.stringify({ Id_Cliente: idCliente, Fecha_Reserva: fecha }),
+                contentType: "application/json",
+                success: res => agregarDetalles(res.id_reserva),
+                error: () => alert("Error al crear reserva")
+            });
+        }
+
+        function agregarDetalles(idReserva) {
+            let done = 0;
+            carrito.forEach(item => {
+                $.ajax({
+                    type: "POST",
+                    url: API.detalle,
+                    data: JSON.stringify({
+                        Id_Reserva: idReserva,
+                        Id_Producto: item.id_producto,
+                        Cantidad: item.cantidad,
+                        Precio_Unitario: item.precio
+                    }),
+                    contentType: "application/json",
+                    success: () => {
+                        actualizarStock(item.id_producto, item.cantidad);
+                        if (++done === carrito.length) {
+                            alert(`Reserva registrada con éxito. Número de reserva: ${idReserva}`);
+                            limpiarTodo();
+                            cargarProductos();
+                        }
+                    }
+                });
+            });
+        }
+
+        function actualizarStock(id, cant) {
+            $.get(`${API.producto}/${id}`, data => {
+                const p = data[0];
+                $.ajax({
+                    type: "PUT",
+                    url: `${API.producto}/${id}`,
+                    data: JSON.stringify({
+                        Id_Producto: p.id_producto,
+                        Nombre: p.nombre,
+                        Codigo: p.codigo,
+                        Precio: p.precio,
+                        Stock: p.stock - cant,
+                        Descripcion: p.descripcion,
+                        Id_Categoria: p.id_categoria,
+                        Id_Proveedor: p.id_proveedor
+                    }),
+                    contentType: "application/json"
+                });
+            });
+        }
+
+        function limpiarTodo() {
+            carrito = [];
+            $("#cliente, #fecha_reserva, #producto, #cantidad").val("");
+            $("#infoStock").html('');
+            mostrarCarrito();
+        }
+
+        $(document).ready(() => {
+            cargarClientes();
+            cargarProductos();
+        });
+    </script>
+
+</body>
+
+</html>

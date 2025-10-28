@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Los Naranjos - Gestión Stock</title>
+  <link rel="stylesheet" href="estilo.css">
+  <link rel="shortcut icon" href="naranjito.png" type="image/x-icon">
+</head>
+
+<body>
+
+  <header>
+    <div class="logo-container">
+      <img src="logo.jpg" alt="Logo Los Naranjos">
+    </div>
+    <h1>Gestión de stock</h1>
+    <a href="admin.html">
+      <input class="volver" type="button" value="Volver">
+    </a>
+  </header>
+
+  <main>
+    <section>
+      <h3>ABM de Productos:</h3>
+      <p><input type="text" id="nombre" placeholder="Nombre del producto*"></p>
+      <p>
+        <input type="text" id="codigo" placeholder="Código*">
+        <input type="text" id="precio" placeholder="Precio*">
+        <input type="text" id="stock" placeholder="Stock*">
+      </p>
+      <p>
+
+        <select id="id_proveedor" class="estilo-input">
+          <option value="">Seleccione un proveedor*</option>
+        </select>
+
+        <select id="categoria" class="estilo-input">
+          <option value="">Seleccione una categoría</option>
+        </select>
+        <input type="text" id="descripcion" placeholder="Descripción del producto">
+      </p>
+      <p>
+        <input type="button" value="Cargar Producto" onclick="guardarProducto()">
+      </p>
+    </section>
+
+    <section>
+      <h3>Buscar, eliminar o modificar productos:</h3>
+      <p>
+        <input type="number" id="buscarId" placeholder="ID Producto">
+        <input type="button" value="Buscar Producto" onclick="buscarProductoPorId()">
+        <input type="button" value="Eliminar Producto" onclick="eliminarProductoPorID()">
+        <input type="button" value="Modificar Producto" onclick="modificarProducto()">
+      </p>
+      <div id="resultadoBusqueda"></div>
+    </section>
+
+    <section>
+      <h3>Listado de Productos:</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Código</th>
+            <th>Precio</th>
+            <th>Stock</th>
+            <th>Descripción</th>
+            <th>ID Categoría</th>
+            <th>Proveedor</th>
+          </tr>
+        </thead>
+        <tbody id="tablaProductos"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer>
+    <h4>Los Naranjos - ABM de productos</h4>
+  </footer>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+  <script>
+    const API_URL = "http://localhost:56925/api/Producto";
+    const API_PROVEEDORES = "http://localhost:56925/api/proveedor";
+    const CATEGORIA_API = "http://localhost:56925/api/categoria";
+
+    function listarProductos() {
+      $.ajax({
+        type: "GET",
+        url: API_URL,
+        dataType: "json",
+        success: function (data) {
+          const tabla = document.getElementById("tablaProductos");
+          tabla.innerHTML = "";
+
+          data.forEach(p => {
+            let fila = `
+              <tr>
+                <td>${p.id_producto}</td>
+                <td>${p.nombre}</td>
+                <td>${p.codigo}</td>
+                <td>${p.precio}</td>
+                <td>${p.stock}</td>
+                <td>${p.descripcion}</td>
+                <td>${p.id_categoria}</td>
+                <td>${p.id_proveedor}</td>
+              </tr>
+            `;
+            tabla.innerHTML += fila;
+          });
+        },
+        error: function () {
+          alert("Error al obtener productos.");
+        }
+      });
+    }
+
+    function cargarCategorias() {
+      $.ajax({
+        type: "GET",
+        url: CATEGORIA_API,
+        dataType: "json",
+        success: function (data) {
+          const select = $("#categoria");
+          select.empty();
+          select.append(`<option value="">Seleccione una categoría*</option>`);
+
+          data.forEach(cat => {
+            select.append(`<option value="${cat.id}">${cat.nombre}</option>`);
+          });
+        },
+        error: function () {
+          alert("Error al cargar las categorías");
+        }
+      });
+    }
+
+    function cargarProveedoresEnSelect() {
+      $.ajax({
+        type: "GET",
+        url: API_PROVEEDORES,
+        dataType: "json",
+        success: function (data) {
+          const select = document.getElementById("id_proveedor");
+          select.innerHTML = `<option value="">Seleccione un proveedor*</option>`;
+
+          data.forEach(p => {
+            const opcion = document.createElement("option");
+            opcion.value = p.id_proveedor;
+            opcion.textContent = p.razon_social;
+            select.appendChild(opcion);
+          });
+        },
+        error: function () {
+          alert("Error al cargar proveedores.");
+        }
+      });
+    }
+
+    function guardarProducto() {
+      const producto = {
+        nombre: $("#nombre").val(),
+        codigo: $("#codigo").val(),
+        precio: parseFloat($("#precio").val()),
+        stock: parseInt($("#stock").val()),
+        descripcion: $("#descripcion").val(),
+        id_categoria: parseInt($("#categoria").val()),
+        id_proveedor: parseInt($("#id_proveedor").val())
+      };
+
+      if (!producto.nombre || !producto.codigo || isNaN(producto.precio) || isNaN(producto.stock) || isNaN(producto.id_proveedor)) {
+        alert("Complete todos los campos obligatorios.");
+        return;
+      }
+
+      $.ajax({
+        type: "POST",
+        url: API_URL,
+        data: JSON.stringify(producto),
+        contentType: "application/json",
+        success: function () {
+          alert("Producto guardado correctamente.");
+          limpiarCampos();
+          listarProductos();
+        },
+        error: function () {
+          alert("Error al guardar producto.");
+        }
+      });
+    }
+
+    function eliminarProductoPorID() {
+      const id = $("#buscarId").val();
+      if (!id || isNaN(id)) {
+        alert("ID inválido");
+        return;
+      }
+
+      $.ajax({
+        type: "DELETE",
+        url: `${API_URL}/${id}`,
+        success: function () {
+          alert("Producto eliminado.");
+          listarProductos();
+        },
+        error: function () {
+          alert("Error al eliminar producto.");
+        }
+      });
+    }
+
+    function modificarProducto() {
+      const id = $("#buscarId").val();
+      if (!id || isNaN(id)) {
+        alert("ID inválido");
+        return;
+      }
+
+      // Cargar los datos del producto
+      $.ajax({
+        type: "GET",
+        url: `${API_URL}/${id}`,
+        dataType: "json",
+        success: function (data) {
+          const producto = data[0];
+
+          // Llenar el formulario con los datos actuales
+          $("#nombre").val(producto.nombre);
+          $("#codigo").val(producto.codigo);
+          $("#precio").val(producto.precio);
+          $("#stock").val(producto.stock);
+          $("#descripcion").val(producto.descripcion || '');
+          $("#categoria").val(producto.id_categoria || '');
+          $("#id_proveedor").val(producto.id_proveedor);
+
+          alert("Producto cargado. Modifique los campos que desee y luego haga clic en 'Guardar Cambios'.");
+
+          // Cambiar el botón temporalmente
+          const btnModificar = document.querySelector('input[value="Cargar Producto"]');
+          btnModificar.value = "Guardar Cambios";
+          btnModificar.onclick = function () { guardarCambios(id); };
+        },
+        error: function () {
+          alert("No se encontró el producto con ID: " + id);
+        }
+      });
+    }
+
+    function guardarCambios(id) {
+      const producto = {
+        Id_Producto: parseInt(id),
+        Nombre: $("#nombre").val(),
+        Codigo: $("#codigo").val(),
+        Precio: parseFloat($("#precio").val()),
+        Stock: parseInt($("#stock").val()),
+        Descripcion: $("#descripcion").val(),
+        Id_Categoria: parseInt($("#categoria").val()),
+        Id_Proveedor: parseInt($("#id_proveedor").val())
+      };
+
+      if (!producto.Nombre || !producto.Codigo || isNaN(producto.Precio) ||
+        isNaN(producto.Stock) || isNaN(producto.Id_Proveedor)) {
+        alert("Complete todos los campos obligatorios.");
+        return;
+      }
+
+      $.ajax({
+        type: "PUT",
+        url: `${API_URL}/${id}`,
+        data: JSON.stringify(producto),
+        contentType: "application/json",
+        success: function () {
+          alert("Producto actualizado correctamente.");
+          limpiarCampos();
+          listarProductos();
+
+          // Volver el botón a su estado original
+          const btnModificar = document.querySelector('input[value="Guardar Cambios"]');
+          btnModificar.value = "Cargar Producto";
+          btnModificar.onclick = guardarProducto();
+        },
+        error: function () {
+          alert("Error al actualizar el producto.");
+        }
+      });
+    }
+
+    function limpiarCampos() {
+      $("#nombre").val("");
+      $("#codigo").val("");
+      $("#precio").val("");
+      $("#stock").val("");
+      $("#descripcion").val("");
+      $("#id_categoria").val("");
+      $("#id_proveedor").val("");
+      $("#buscarId").val("");
+    }
+
+    $(document).ready(function () {
+      listarProductos();
+      cargarProveedoresEnSelect();
+      cargarCategorias();
+    });
+  </script>
+</body>
+
+</html>

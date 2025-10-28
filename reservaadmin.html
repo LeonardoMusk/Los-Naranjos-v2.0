@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Los Naranjos - Reservas Admin</title>
+    <link rel="stylesheet" href="estilo.css">
+    <link rel="shortcut icon" href="naranjito.png" type="image/x-icon">
+</head>
+
+<body>
+
+    <header>
+        <div class="logo-container">
+            <img src="logo.jpg" alt="Logo Los Naranjos">
+        </div>
+        <h1>Gestión de Reservas</h1>
+        <a href="admin.html">
+            <input class="volver" type="button" value="Volver">
+        </a>
+    </header>
+
+    <main>
+        <section>
+            <h3>Acciones:</h3>
+            <p>
+                <input type="number" id="idReserva" placeholder="ID Reserva">
+                <input type="button" value="Marcar como Pagado" onclick="marcarPagado()">
+                <input type="button" value="Ver Detalle" onclick="verDetalle()">
+                <input type="button" value="Eliminar Reserva" onclick="eliminarReserva()">
+            </p>
+        </section>
+
+        <section id="seccionDetalle" style="display:none;">
+            <h3>Detalle de Reserva:</h3>
+            <div id="infoReserva"></div>
+
+            <h4>Productos:</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Cantidad</th>
+                        <th>Precio Unit.</th>
+                        <th>Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaDetalle"></tbody>
+            </table>
+        </section>
+
+        <section>
+            <h3>Listado de Reservas:</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Cliente</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaReservas"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <footer>
+        <h4>Los Naranjos - Gestión de Reservas</h4>
+    </footer>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+    <script>
+        const API_RESERVA = "http://localhost:56925/api/reserva";
+        const API_DETALLE = "http://localhost:56925/api/detallereserva";
+        const API_CLIENTE = "http://localhost:56925/api/cliente";
+        const API_PRODUCTO = "http://localhost:56925/api/producto";
+
+        let clientes = [];
+        let productos = [];
+
+        function cargarDatos() {
+            $.ajax({
+                type: "GET",
+                url: API_CLIENTE,
+                dataType: "json",
+                success: function (data) {
+                    clientes = data;
+                }
+            });
+
+            $.ajax({
+                type: "GET",
+                url: API_PRODUCTO,
+                dataType: "json",
+                success: function (data) {
+                    productos = data;
+                }
+            });
+        }
+
+        function listarReservas() {
+            $.ajax({
+                type: "GET",
+                url: API_RESERVA,
+                dataType: "json",
+                success: function (data) {
+                    const tabla = $("#tablaReservas");
+                    tabla.html("");
+
+                    data.forEach(r => {
+                        const cliente = clientes.find(c => c.id_cliente === r.id_cliente);
+                        const nombreCliente = cliente ? cliente.nombre : `ID: ${r.id_cliente}`;
+                        const fecha = new Date(r.fecha_reserva).toLocaleDateString('es-AR');
+
+                        let fila = `
+                            <tr>
+                                <td>${r.id_reserva}</td>
+                                <td>${nombreCliente}</td>
+                                <td>${fecha}</td>
+                                <td>${r.estado}</td>
+                                <td>$${r.total.toFixed(2)}</td>
+                            </tr>
+                        `;
+                        tabla.append(fila);
+                    });
+                }
+            });
+        }
+
+        function marcarPagado() {
+            const id = $("#idReserva").val();
+            if (!id) {
+                alert("Ingrese un ID de reserva");
+                return;
+            }
+
+            $.ajax({
+                type: "GET",
+                url: `${API_RESERVA}/${id}`,
+                dataType: "json",
+                success: function (data) {
+                    const reserva = data[0];
+
+                    $.ajax({
+                        type: "PUT",
+                        url: `${API_RESERVA}/${id}`,
+                        data: JSON.stringify({
+                            Id_Reserva: parseInt(id),
+                            Id_Cliente: reserva.id_cliente,
+                            Fecha_Reserva: reserva.fecha_reserva,
+                            Estado: "Pagado"
+                        }),
+                        contentType: "application/json",
+                        success: function () {
+                            alert("Reserva marcada como Pagado");
+                            listarReservas();
+                            $("#idReserva").val("");
+                        },
+                        error: function () {
+                            alert("Error al actualizar estado");
+                        }
+                    });
+                },
+                error: function () {
+                    alert("Reserva no encontrada");
+                }
+            });
+        }
+
+        function verDetalle() {
+            const id = $("#idReserva").val();
+            if (!id) {
+                alert("Ingrese un ID de reserva");
+                return;
+            }
+
+            $.ajax({
+                type: "GET",
+                url: `${API_RESERVA}/${id}`,
+                dataType: "json",
+                success: function (data) {
+                    const reserva = data[0];
+                    const cliente = clientes.find(c => c.id_cliente === reserva.id_cliente);
+                    const nombreCliente = cliente ? cliente.nombre : `ID: ${reserva.id_cliente}`;
+
+                    $("#infoReserva").html(`
+                        <p><strong>Reserva #${id}</strong></p>
+                        <p>Cliente: ${nombreCliente}</p>
+                        <p>Fecha: ${new Date(reserva.fecha_reserva).toLocaleDateString('es-AR')}</p>
+                        <p>Estado: ${reserva.estado}</p>
+                        <p>Total: $${reserva.total.toFixed(2)}</p>
+                    `);
+
+                    $.ajax({
+                        type: "GET",
+                        url: `${API_DETALLE}/reserva/${id}`,
+                        dataType: "json",
+                        success: function (dataDetalle) {
+                            const tabla = $("#tablaDetalle");
+                            tabla.html("");
+
+                            if (dataDetalle.length === 0) {
+                                tabla.append(`<tr><td colspan="4">No hay productos</td></tr>`);
+                            } else {
+                                dataDetalle.forEach(d => {
+                                    const producto = productos.find(p => p.id_producto === d.id_producto);
+                                    const nombreProducto = producto ? producto.nombre : `Producto ${d.id_producto}`;
+
+                                    tabla.append(`
+                                        <tr>
+                                            <td>${nombreProducto}</td>
+                                            <td>${d.cantidad}</td>
+                                            <td>$${d.precio_unitario.toFixed(2)}</td>
+                                            <td>$${d.subtotal.toFixed(2)}</td>
+                                        </tr>
+                                    `);
+                                });
+                            }
+
+                            $("#seccionDetalle").show();
+                        }
+                    });
+                },
+                error: function () {
+                    alert("Reserva no encontrada");
+                }
+            });
+        }
+
+        function eliminarReserva() {
+            const id = $("#idReserva").val();
+            if (!id) {
+                alert("Ingrese un ID de reserva");
+                return;
+            }
+
+            if (!confirm("¿Está seguro de eliminar esta reserva y todos sus productos?")) {
+                return;
+            }
+
+            $.ajax({
+                type: "DELETE",
+                url: `${API_RESERVA}/${id}`,
+                success: function () {
+                    alert("Reserva eliminada correctamente");
+                    $("#seccionDetalle").hide();
+                    $("#idReserva").val("");
+                    listarReservas();
+                },
+                error: function () {
+                    alert("Error al eliminar reserva");
+                }
+            });
+        }
+
+        $(document).ready(function () {
+            cargarDatos();
+            setTimeout(function () {
+                listarReservas();
+            }, 500);
+        });
+    </script>
+
+</body>
+
+</html>

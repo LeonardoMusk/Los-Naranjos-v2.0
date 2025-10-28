@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Los Naranjos - Clientes</title>
+    <link rel="stylesheet" href="estilo.css">
+    <link rel="shortcut icon" href="naranjito.png" type="image/x-icon">
+</head>
+
+<body>
+
+    <header>
+        <div class="logo-container">
+            <img src="logo.jpg" alt="Logo Los Naranjos">
+        </div>
+        <h1>Gestión de clientes</h1>
+        <a href="cliente.html">
+            <input class="volver" type="button" value="Volver">
+        </a>
+    </header>
+
+    <main>
+        <section>
+            <h3>Alta de Clientes:</h3>
+            <p>
+                <input type="text" id="nombre" placeholder="Nombre*">
+                <input type="text" id="dni" placeholder="DNI*">
+                <input type="text" id="telefono" placeholder="Teléfono">
+            </p>
+            <p>
+                <input type="text" id="email" placeholder="Email">
+                <input type="text" id="direccion" placeholder="Calle">
+                <input type="number" id="numero" placeholder="Número*">
+            </p>
+            <p>
+                <select id="localidad" class="estilo-input">
+                    <option value="">Seleccione una localidad*</option>
+                </select>
+            </p>
+            <p>
+                <input type="button" value="Cargar Cliente" onclick="guardarCliente()">
+            </p>
+        </section>
+
+        <section>
+            <h3>Buscar o Eliminar Cliente:</h3>
+            <p>
+                <input type="number" id="buscarId" placeholder="ID Cliente">
+                <input type="button" value="Buscar Cliente" onclick="buscarClientePorId()">
+                <input type="button" value="Eliminar Cliente" onclick="eliminarClientePorId()">
+                <input type="button" value="Modificar Cliente" onclick="modificarCliente()">
+            </p>
+            <div id="resultadoBusqueda"></div>
+        </section>
+
+        <section>
+            <h3>Listado de Clientes:</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>DNI</th>
+                        <th>Teléfono</th>
+                        <th>Email</th>
+                        <th>Calle</th>
+                        <th>Número</th>
+                        <th>Localidad</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaClientes"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <footer>
+        <h4>Los Naranjos - Gestión de clientes</h4>
+    </footer>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+    <script>
+        const API_URL = "http://localhost:56925/api/cliente";
+        const LOCALIDAD_API = "http://localhost:56925/api/localidad";
+
+        function cargarLocalidades() {
+            $.ajax({
+                type: "GET",
+                url: LOCALIDAD_API,
+                dataType: "json",
+                success: function (data) {
+                    const select = $("#localidad");
+                    select.empty();
+                    select.append(`<option value="">Seleccione una localidad*</option>`);
+
+                    data.forEach(loc => {
+                        select.append(`<option value="${loc.id_localidad}">${loc.nombre}</option>`);
+                    });
+                },
+                error: function () {
+                    alert("Error al cargar localidades");
+                }
+            });
+        }
+
+        function guardarCliente() {
+            const cliente = {
+                nombre: $("#nombre").val(),
+                dni: $("#dni").val(),
+                telefono: $("#telefono").val(),
+                email: $("#email").val(),
+                calle: $("#direccion").val(),
+                numero: parseInt($("#numero").val()),
+                id_localidad: parseInt($("#localidad").val())
+            };
+
+            if (cliente.nombre && cliente.dni && cliente.id_localidad) {
+                $.ajax({
+                    type: "POST",
+                    url: API_URL,
+                    data: cliente,
+                    success: function () {
+                        alert("Cliente guardado correctamente");
+                        limpiarCampos();
+                        listarClientes();
+                    },
+                    error: function () {
+                        alert("Error al guardar cliente");
+                    }
+                });
+            } else {
+                alert("Complete los campos obligatorios: Nombre, DNI y Localidad");
+            }
+        }
+
+        function listarClientes() {
+            $.ajax({
+                type: "GET",
+                url: API_URL,
+                dataType: "xml",
+                success: function (xml) {
+                    const tabla = $("#tablaClientes");
+                    tabla.html("");
+                    $(xml).find("Table").each(function () {
+                        let fila = `
+                        <tr>
+                            <td>${$(this).find("id_cliente").text()}</td>
+                            <td>${$(this).find("nombre").text()}</td>
+                            <td>${$(this).find("dni").text()}</td>
+                            <td>${$(this).find("telefono").text()}</td>
+                            <td>${$(this).find("email").text()}</td>
+                            <td>${$(this).find("calle").text()}</td>
+                            <td>${$(this).find("numero").text()}</td>
+                            <td>${$(this).find("id_localidad").text()}</td>
+                        </tr>
+                    `;
+                        tabla.append(fila);
+                    });
+                },
+                error: function () {
+                    alert("Error al obtener los clientes");
+                }
+            });
+        }
+
+        function buscarClientePorId() {
+            const id = $("#buscarId").val();
+            if (!id) {
+                alert("Ingrese un ID válido");
+                return;
+            }
+
+            $.ajax({
+                type: "GET",
+                url: `${API_URL}/${id}`,
+                dataType: "xml",
+                success: function (xml) {
+                    const cliente = $(xml).find("Table");
+
+                    if (cliente.length === 0) {
+                        $("#resultadoBusqueda").html(`<p style="color:red">Cliente no encontrado</p>`);
+                        return;
+                    }
+
+                    let info = `
+                    <p><strong>Cliente encontrado:</strong></p>
+                    <ul>
+                        <li>ID: ${cliente.find("id_cliente").text()}</li>
+                        <li>Nombre: ${cliente.find("nombre").text()}</li>
+                        <li>DNI: ${cliente.find("dni").text()}</li>
+                        <li>Teléfono: ${cliente.find("telefono").text()}</li>
+                        <li>Email: ${cliente.find("email").text()}</li>
+                        <li>Calle: ${cliente.find("calle").text()} ${cliente.find("numero").text()}</li>
+                        <li>Localidad: ${cliente.find("id_localidad").text()}</li>
+                    </ul>
+                `;
+                    $("#resultadoBusqueda").html(info);
+                },
+                error: function () {
+                    $("#resultadoBusqueda").html(`<p style="color:red">Cliente no encontrado</p>`);
+                }
+            });
+        }
+
+        function eliminarClientePorId() {
+            const id = $("#buscarId").val();
+            if (!id) {
+                alert("Ingrese un ID válido");
+                return;
+            }
+
+            if (!confirm("¿Seguro que desea eliminar este cliente?")) return;
+
+            $.ajax({
+                type: "DELETE",
+                url: `${API_URL}/${id}`,
+                success: function () {
+                    alert("Cliente eliminado correctamente");
+                    $("#resultadoBusqueda").html("");
+                    listarClientes();
+                },
+                error: function () {
+                    alert("Error al eliminar cliente");
+                }
+            });
+        }
+
+        function modificarCliente() {
+            const id = $("#buscarId").val();
+            if (!id) {
+                alert("Ingrese un ID válido");
+                return;
+            }
+
+            $.ajax({
+                type: "GET",
+                url: `${API_URL}/${id}`,
+                dataType: "xml",
+                success: function (xml) {
+                    const cliente = $(xml).find("Table");
+
+                    if (cliente.length === 0) {
+                        alert("Cliente no encontrado");
+                        return;
+                    }
+
+                    $("#nombre").val(cliente.find("nombre").text());
+                    $("#dni").val(cliente.find("dni").text());
+                    $("#telefono").val(cliente.find("telefono").text());
+                    $("#email").val(cliente.find("email").text());
+                    $("#direccion").val(cliente.find("calle").text());
+                    $("#numero").val(cliente.find("numero").text());
+                    $("#localidad").val(cliente.find("id_localidad").text());
+
+                    alert("Cliente cargado. Modifique los campos que desee y luego haga clic en 'Guardar Cambios'.");
+
+                    const btnCargar = document.querySelector('input[value="Cargar Cliente"]');
+                    btnCargar.value = "Guardar Cambios";
+                    btnCargar.onclick = function () { guardarCambiosCliente(id); };
+                },
+                error: function () {
+                    alert("Cliente no encontrado");
+                }
+            });
+        }
+
+        function guardarCambiosCliente(id) {
+            const cliente = {
+                Id_Cliente: parseInt(id),
+                Nombre: $("#nombre").val(),
+                Dni: $("#dni").val(),
+                Telefono: $("#telefono").val(),
+                Email: $("#email").val(),
+                Calle: $("#direccion").val(),
+                Numero: parseInt($("#numero").val()),
+                Id_Localidad: parseInt($("#localidad").val())
+            };
+
+            if (!cliente.Nombre || !cliente.Dni || isNaN(cliente.Id_Localidad)) {
+                alert("Complete los campos obligatorios: Nombre, DNI y Localidad");
+                return;
+            }
+
+            $.ajax({
+                type: "PUT",
+                url: `${API_URL}/${id}`,
+                data: cliente,
+                success: function () {
+                    alert("Cliente actualizado correctamente.");
+                    limpiarCampos();
+                    listarClientes();
+
+                    const btnCargar = document.querySelector('input[value="Guardar Cambios"]');
+                    btnCargar.value = "Cargar Cliente";
+                    btnCargar.onclick = guardarCliente;
+                },
+                error: function () {
+                    alert("Error al actualizar el cliente.");
+                }
+            });
+        }
+
+        function limpiarCampos() {
+            $("#nombre").val("");
+            $("#dni").val("");
+            $("#telefono").val("");
+            $("#email").val("");
+            $("#direccion").val("");
+            $("#numero").val("");
+            $("#localidad").val("");
+        }
+
+        $(document).ready(function () {
+            listarClientes();
+            cargarLocalidades();
+        });
+    </script>
+
+</body>
+
+</html>
